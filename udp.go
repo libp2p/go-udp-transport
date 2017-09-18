@@ -2,7 +2,6 @@ package udp
 
 import (
 	"context"
-	"net"
 	"sync"
 
 	tpt "github.com/libp2p/go-libp2p-transport"
@@ -38,14 +37,14 @@ func (t *UDPTransport) Listen(laddr ma.Multiaddr) (tpt.PacketConn, error) {
 		return s, nil
 	}
 
-	rawconn, err := manet.ListenUDP(laddr)
+	rawconn, err := manet.ListenPacket(laddr)
 	if err != nil {
 		return nil, err
 	}
 
 	conn := &UDPConn{
-		UDPConn:   rawconn,
-		transport: t,
+		PacketConn: rawconn,
+		transport:  t,
 	}
 
 	t.conns[laddr.String()] = conn
@@ -57,37 +56,8 @@ func (t *UDPTransport) Matches(addr ma.Multiaddr) bool {
 }
 
 type UDPConn struct {
-	*manet.UDPConn
+	manet.PacketConn
 	transport *UDPTransport
-}
-
-func (c *UDPConn) ReadMsg(b []byte) (int, ma.Multiaddr, error) {
-	n, _, _, netaddr, err := c.UDPConn.ReadMsgUDP(b, []byte{})
-	if err != nil {
-		return n, nil, err
-	}
-
-	raddr, err := manet.FromNetAddr(netaddr)
-	if err != nil {
-		return n, nil, err
-	}
-
-	return n, raddr, nil
-}
-
-func (c *UDPConn) WriteMsg(b []byte, raddr ma.Multiaddr) (int, error) {
-	network, netaddr, err := manet.DialArgs(raddr)
-	if err != nil {
-		return 0, err
-	}
-
-	udpaddr, err := net.ResolveUDPAddr(network, netaddr)
-	if err != nil {
-		return 0, err
-	}
-
-	n, _, err := c.UDPConn.WriteMsgUDP(b, nil, udpaddr)
-	return n, err
 }
 
 func (c *UDPConn) Dial(raddr ma.Multiaddr) (tpt.PacketConn, error) {
@@ -98,7 +68,7 @@ func (c *UDPConn) DialContext(ctx context.Context, raddr ma.Multiaddr) (tpt.Pack
 	return c, nil
 }
 
-func (C *UDPConn) Matches(addr ma.Multiaddr) bool {
+func (t *UDPConn) Matches(addr ma.Multiaddr) bool {
 	return mafmt.UDP.Matches(addr)
 }
 
